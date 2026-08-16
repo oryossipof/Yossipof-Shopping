@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ייצוא רשימות הקניות → פקודות SQL</title>
+<style>
+  :root {
+    --bg: #f6f8fb;
+    --card: #ffffff;
+    --ink: #0f172a;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --brand: #0284c7;
+    --brand-ink: #ffffff;
+    --ok: #059669;
+    --warn: #b45309;
+    --err: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 16px 64px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin: 0 0 24px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card h2 {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    margin: 0 0 14px;
+  }
+  label { display: block; font-size: .82rem; color: var(--muted); margin: 12px 0 5px; }
+  input, textarea {
+    width: 100%;
+    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: #fbfcfe;
+    color: var(--ink);
+    direction: ltr;
+    text-align: left;
+  }
+  input:focus, textarea:focus { outline: 2px solid #bae6fd; border-color: var(--brand); }
+  button {
+    font: 600 15px system-ui, sans-serif;
+    padding: 13px 20px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--brand);
+    color: var(--brand-ink);
+    cursor: pointer;
+    transition: opacity .15s;
+  }
+  button:hover:not(:disabled) { opacity: .88; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.ghost {
+    background: #f1f5f9;
+    color: var(--ink);
+    border: 1px solid var(--line);
+    font-size: 14px;
+    padding: 10px 16px;
+  }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .full { width: 100%; margin-top: 16px; }
+  #log { font-size: .88rem; margin-top: 14px; min-height: 1.4em; }
+  #log div { padding: 2px 0; }
+  .ok { color: var(--ok); }
+  .warn { color: var(--warn); }
+  .err { color: var(--err); font-weight: 600; }
+  .muted { color: var(--muted); }
+  #out { display: none; }
+  textarea {
+    height: 320px;
+    resize: vertical;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+  }
+  .stats {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 14px 0 4px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 14px;
+  }
+  .stat b { display: block; font-size: 1.5rem; line-height: 1.2; }
+  .stat span { font-size: .75rem; color: var(--muted); }
+  ol { padding-inline-start: 20px; margin: 0; }
+  ol li { margin-bottom: 7px; }
+  code {
+    background: #f1f5f9;
+    padding: 1px 6px;
+    border-radius: 5px;
+    font-size: .87em;
+    direction: ltr;
+    display: inline-block;
+  }
+  .note {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #78350f;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: .85rem;
+    margin-top: 14px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>🛒 ייצוא רשימות הקניות</h1>
+  <p class="sub">שולף את כל הנתונים מהמסד הישן ומייצר פקודות SQL מוכנות להדבקה במסד החדש.</p>
+
+  <div class="card">
+    <h2>המסד הישן</h2>
+    <p class="sub" style="margin:0">הערכים כבר מולאים מהפרויקט שלך. אין צורך לשנות דבר.</p>
+    <label for="url">כתובת</label>
+    <input id="url" spellcheck="false" />
+    <label for="key">מפתח ציבורי (anon)</label>
+    <input id="key" spellcheck="false" />
+    <button id="go" class="full">שלוף את הנתונים</button>
+    <div id="log"></div>
+  </div>
+
+  <div class="card" id="out">
+    <h2>התוצאה</h2>
+    <div class="stats" id="stats"></div>
+
+    <div class="row">
+      <button id="copy">📋 העתק הכל</button>
+      <button id="dl" class="ghost">⬇ הורד כקובץ .sql</button>
+      <button id="dlj" class="ghost">⬇ גיבוי JSON</button>
+    </div>
+
+    <label for="sql">פקודות ה-SQL</label>
+    <textarea id="sql" readonly spellcheck="false"></textarea>
+
+    <h2 style="margin-top:22px">מה עושים עכשיו</h2>
+    <ol>
+      <li>נכנסים לפרויקט ה-Supabase <b>החדש</b> שלך</li>
+      <li>בתפריט הצדדי: <b>SQL Editor</b> → <b>New query</b></li>
+      <li>מוודאים שכבר הרצת שם את <code>supabase/setup.sql</code> — אחרת הטבלאות לא קיימות</li>
+      <li>מדביקים את כל מה שהעתקת ולוחצים <b>Run</b></li>
+    </ol>
+    <div class="note">
+      אפשר להריץ את הפקודות פעמיים בלי חשש — שורות שכבר קיימות פשוט ידולגו.
+    </div>
+  </div>
+
+</div>
+
+<script>
+const PRESET_URL = "https://uathbeyvaqowaodrblrg.supabase.co";
+const PRESET_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhdGhiZXl2YXFvd2FvZHJibHJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMTMzMjAsImV4cCI6MjA5Mzg4OTMyMH0.8ZSSAilmqU3qlWP1FKn1xYz0y-oLgYxtIV-PaGsMe7I";
+
+const $ = (id) => document.getElementById(id);
+$("url").value = PRESET_URL;
+$("key").value = PRESET_KEY;
+
+const logBox = $("log");
+const say = (msg, cls = "muted") => {
+  const d = document.createElement("div");
+  d.className = cls;
+  d.textContent = msg;
+  logBox.appendChild(d);
+};
+
+// ---- SQL value formatting -------------------------------------------------
+
+function sqlValue(v) {
+  if (v === null || v === undefined) return "NULL";
+  if (typeof v === "boolean") return v ? "true" : "false";
+  if (typeof v === "number") return Number.isFinite(v) ? String(v) : "NULL";
+  if (typeof v === "object") {
+    // jsonb columns
+    return quote(JSON.stringify(v)) + "::jsonb";
+  }
+  return quote(String(v));
+}
+
+function quote(s) {
+  // Postgres escapes a single quote by doubling it.
+  // E'' syntax handles backslashes safely if any sneak in.
+  const escaped = s.replace(/'/g, "''");
+  return escaped.includes("\\") ? "E'" + escaped.replace(/\\/g, "\\\\") + "'" : "'" + escaped + "'";
+}
+
+function buildInsert(table, rows, columns) {
+  if (!rows.length) return `-- ${table}: אין שורות\n`;
+
+  const cols = columns.map((c) => `"${c}"`).join(", ");
+  const lines = rows.map(
+    (r) => "  (" + columns.map((col) => sqlValue(r[col] ?? null)).join(", ") + ")",
+  );
+
+  return (
+    `-- ${table} — ${rows.length} שורות\n` +
+    `INSERT INTO public.${table} (${cols}) VALUES\n` +
+    lines.join(",\n") +
+    `\nON CONFLICT (id) DO NOTHING;\n`
+  );
+}
+
+// ---- Fetching -------------------------------------------------------------
+
+const PAGE = 1000;
+
+async function fetchTable(base, key, table) {
+  const rows = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const url = `${base}/rest/v1/${table}?select=*&order=id.asc&limit=${PAGE}&offset=${offset}`;
+    const res = await fetch(url, {
+      headers: { apikey: key, Authorization: "Bearer " + key },
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      const hint =
+        res.status === 401 ? "המפתח שגוי או שהפרויקט הושבת."
+        : res.status === 404 ? "הטבלה לא נמצאה."
+        : res.status === 403 ? "אין הרשאת קריאה."
+        : "";
+      throw new Error(`שגיאה ${res.status} בטבלה ${table}. ${hint} ${body.slice(0, 160)}`);
+    }
+
+    const page = await res.json();
+    rows.push(...page);
+    if (page.length < PAGE) break;
+  }
+  return rows;
+}
+
+// ---- Main -----------------------------------------------------------------
+
+const LIST_COLS = ["id", "phone_number", "name", "items", "created_at"];
+const ITEM_COLS = [
+  "id", "phone_number", "list_id", "name", "quantity", "unit",
+  "image_url", "checked", "category", "notes", "added_at",
+];
+
+let lastSql = "";
+let lastJson = "";
+
+$("go").addEventListener("click", async () => {
+  const base = $("url").value.trim().replace(/\/+$/, "");
+  const key = $("key").value.trim();
+  logBox.innerHTML = "";
+  $("out").style.display = "none";
+  $("go").disabled = true;
+
+  try {
+    if (!base.startsWith("https://")) throw new Error("הכתובת חייבת להתחיל ב-https://");
+    if (!key) throw new Error("חסר מפתח.");
+
+    say("מתחבר…");
+    const lists = await fetchTable(base, key, "saved_lists");
+    say(`נמצאו ${lists.length} רשימות`, "ok");
+
+    const items = await fetchTable(base, key, "grocery_items");
+    say(`נמצאו ${items.length} מוצרים`, "ok");
+
+    if (!lists.length && !items.length) {
+      say("המסד ריק — אין מה לייצא.", "warn");
+      return;
+    }
+
+    // saved_lists must be inserted first: grocery_items.list_id references it.
+    lastSql =
+      `-- ============================================\n` +
+      `-- ייצוא רשימות קניות\n` +
+      `-- נוצר: ${new Date().toLocaleString("he-IL")}\n` +
+      `-- מקור: ${base}\n` +
+      `-- ============================================\n` +
+      `-- הריצו קודם את supabase/setup.sql ליצירת הטבלאות.\n\n` +
+      `BEGIN;\n\n` +
+      buildInsert("saved_lists", lists, LIST_COLS) +
+      `\n` +
+      buildInsert("grocery_items", items, ITEM_COLS) +
+      `\nCOMMIT;\n`;
+
+    lastJson = JSON.stringify(
+      { נוצר: new Date().toISOString(), מקור: base, saved_lists: lists, grocery_items: items },
+      null, 2,
+    );
+
+    const phones = new Set(lists.map((r) => r.phone_number));
+    const kb = Math.round(new Blob([lastSql]).size / 1024);
+    $("stats").innerHTML = `
+      <div class="stat"><b>${lists.length}</b><span>רשימות</span></div>
+      <div class="stat"><b>${items.length}</b><span>מוצרים</span></div>
+      <div class="stat"><b>${phones.size}</b><span>מספרי טלפון</span></div>
+      <div class="stat"><b>${kb}KB</b><span>גודל</span></div>`;
+
+    $("sql").value = lastSql;
+    $("out").style.display = "block";
+    say("מוכן ✓", "ok");
+
+    if (kb > 900) {
+      say("הקובץ גדול — עדיף להוריד כקובץ ולהעלות אותו ב-SQL Editor במקום להדביק.", "warn");
+    }
+    $("out").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) {
+    say(e.message, "err");
+    say("אם השגיאה היא 'Failed to fetch' — ייתכן שהפרויקט הישן כבר הושבת, או שאין חיבור לאינטרנט.", "muted");
+  } finally {
+    $("go").disabled = false;
+  }
+});
+
+function download(text, filename, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+$("copy").addEventListener("click", async () => {
+  const btn = $("copy");
+  try {
+    await navigator.clipboard.writeText(lastSql);
+  } catch {
+    $("sql").select();
+    document.execCommand("copy");
+  }
+  btn.textContent = "✓ הועתק";
+  setTimeout(() => (btn.textContent = "📋 העתק הכל"), 1800);
+});
+
+$("dl").addEventListener("click", () => download(lastSql, "grocery-import.sql", "text/plain"));
+$("dlj").addEventListener("click", () => download(lastJson, "grocery-backup.json", "application/json"));
+</script>
+</body>
+</html>
