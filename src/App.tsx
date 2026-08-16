@@ -7,6 +7,7 @@ import { ListSwitcher } from "@/components/ListSwitcher";
 import { ImportItemsDialog } from "@/components/ImportItemsDialog";
 import { ImportFromListDialog } from "@/components/ImportFromListDialog";
 import { ExportListDialog } from "@/components/ExportListDialog";
+import { NotifyDialog } from "@/components/NotifyDialog";
 import { PhoneGate } from "@/components/PhoneGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,7 @@ export default function App() {
   const [showImport, setShowImport] = useState(false);
   const [showImportFromList, setShowImportFromList] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showNotify, setShowNotify] = useState(false);
   const [search, setSearch] = useState("");
   const [hideChecked, setHideChecked] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
@@ -195,6 +197,14 @@ export default function App() {
                 </button>
               )}
               <button
+                onClick={() => setShowNotify(true)}
+                className="text-[10px] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
+                aria-label="שליחת עדכון בוואטסאפ"
+                title="הודעה שסיימת לעדכן / לקנות"
+              >
+                💬 עדכון
+              </button>
+              <button
                 onClick={clearPhone}
                 className="text-[10px] text-muted-foreground hover:text-foreground"
                 aria-label="החלף מספר טלפון"
@@ -339,6 +349,13 @@ export default function App() {
         currentListId={currentListId}
         phone={phone}
         onImport={importItems}
+      />
+
+      <NotifyDialog
+        open={showNotify}
+        onClose={() => setShowNotify(false)}
+        listName={currentList?.name ?? "רשימת קניות"}
+        phone={phone}
       />
 
       <ExportListDialog
