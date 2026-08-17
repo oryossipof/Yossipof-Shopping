@@ -120,10 +120,12 @@ export function useGroceryList(phone: string | null, listId: string | null) {
   // Never awaited by callers — a best-effort refinement of the instant local
   // keyword guess, safe to fail silently offline or on API errors.
   const refineCategory = useCallback((id: string, name: string, currentCategory: string) => {
-    classifyItemsWithAI([name]).then((map) => {
+    classifyItemsWithAI([name]).then(async (map) => {
       const aiCategory = map[name];
       if (aiCategory && aiCategory !== currentCategory) {
-        supabase.from("grocery_items").update({ category: aiCategory }).eq("id", id);
+        // supabase-js query builders only actually dispatch the request once
+        // their thenable is consumed, so this await is required, not optional.
+        await supabase.from("grocery_items").update({ category: aiCategory }).eq("id", id);
       }
     });
   }, []);
@@ -183,11 +185,13 @@ export function useGroceryList(phone: string | null, listId: string | null) {
 
     // Background batch refinement: ask AI for every imported name at once,
     // then correct any rows whose local keyword guess it disagrees with.
-    classifyItemsWithAI(newItems.map((i) => i.name)).then((map) => {
+    classifyItemsWithAI(newItems.map((i) => i.name)).then(async (map) => {
       for (const item of newItems) {
         const aiCategory = map[item.name];
         if (aiCategory && aiCategory !== item.category) {
-          supabase.from("grocery_items").update({ category: aiCategory }).eq("id", item.id);
+          // supabase-js query builders only actually dispatch the request
+          // once their thenable is consumed, so this await is required.
+          await supabase.from("grocery_items").update({ category: aiCategory }).eq("id", item.id);
         }
       }
     });
