@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { GroceryItem } from "@/lib/grocery-store";
 import { getCategoryForItem } from "@/lib/grocery-categories";
 import { readCachedItems, writeCachedItems } from "@/lib/offline-cache";
+import { classifyItemsWithAI } from "@/lib/ai-classify";
 
 interface DbRow {
   id: string;
@@ -113,6 +114,20 @@ export function useGroceryList(phone: string | null, listId: string | null) {
     };
   }, [phone, listId]);
 
+  // Fires a background AI classification for a single item and, if it
+  // disagrees with the category already on the row, updates it in Supabase.
+  // The realtime subscription above then syncs the correction into `items`.
+  // Never awaited by callers — a best-effort refinement of the instant local
+  // keyword guess, safe to fail silently offline or on API errors.
+  const refineCategory = useCallback((id: string, name: string, currentCategory: string) => {
+    classifyItemsWithAI([name]).then((map) => {
+      const aiCategory = map[name];
+      if (aiCategory && aiCategory !== currentCategory) {
+        supabase.from("grocery_items").update({ category: aiCategory }).eq("id", id);
+      }
+    });
+  }, []);
+
   const addItem = useCallback(
     async (name: string, quantity: number, unit: string, imageUrl?: string, notes?: string) => {
       if (!phoneRef.current || !listIdRef.current) return;
@@ -135,8 +150,9 @@ export function useGroceryList(phone: string | null, listId: string | null) {
       if (error || !data) return;
       const item = rowToItem(data as DbRow);
       setItems((prev) => (prev.find((i) => i.id === item.id) ? prev : [item, ...prev]));
+      refineCategory(item.id, name, initialCategory.key);
     },
-    [],
+    [refineCategory],
   );
 
   const importItems = useCallback(async (entries: (string | ImportEntry)[]) => {
@@ -163,6 +179,17 @@ export function useGroceryList(phone: string | null, listId: string | null) {
       const existing = new Set(prev.map((i) => i.id));
       const fresh = newItems.filter((i) => !existing.has(i.id));
       return [...fresh, ...prev];
+    });
+
+    // Background batch refinement: ask AI for every imported name at once,
+    // then correct any rows whose local keyword guess it disagrees with.
+    classifyItemsWithAI(newItems.map((i) => i.name)).then((map) => {
+      for (const item of newItems) {
+        const aiCategory = map[item.name];
+        if (aiCategory && aiCategory !== item.category) {
+          supabase.from("grocery_items").update({ category: aiCategory }).eq("id", item.id);
+        }
+      }
     });
   }, []);
 
@@ -236,8 +263,11 @@ export function useGroceryList(phone: string | null, listId: string | null) {
         ),
       );
       await supabase.from("grocery_items").update(dbUpdates).eq("id", id);
+      if (dbUpdates.category !== undefined && updates.name !== undefined) {
+        refineCategory(id, updates.name, dbUpdates.category);
+      }
     },
-    [items],
+    [items, refineCategory],
   );
 
   // Mirror every change into the cache so an offline reopen shows the latest
