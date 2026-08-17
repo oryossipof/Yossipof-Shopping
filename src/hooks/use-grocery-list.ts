@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { GroceryItem } from "@/lib/grocery-store";
-import { getCategoryForItem } from "@/lib/grocery-categories";
+import { getCategoryForItem, type GroceryCategory } from "@/lib/grocery-categories";
 import { readCachedItems, writeCachedItems } from "@/lib/offline-cache";
 import { classifyItemsWithAI } from "@/lib/ai-classify";
 
@@ -40,13 +40,19 @@ function rowToItem(row: DbRow): GroceryItem {
   };
 }
 
-export function useGroceryList(phone: string | null, listId: string | null) {
+export function useGroceryList(
+  phone: string | null,
+  listId: string | null,
+  categories: GroceryCategory[],
+) {
   const [items, setItems] = useState<GroceryItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const phoneRef = useRef(phone);
   const listIdRef = useRef(listId);
+  const categoriesRef = useRef(categories);
   phoneRef.current = phone;
   listIdRef.current = listId;
+  categoriesRef.current = categories;
 
   useEffect(() => {
     if (!phone || !listId) {
@@ -120,7 +126,7 @@ export function useGroceryList(phone: string | null, listId: string | null) {
   // Never awaited by callers — a best-effort refinement of the instant local
   // keyword guess, safe to fail silently offline or on API errors.
   const refineCategory = useCallback((id: string, name: string, currentCategory: string) => {
-    classifyItemsWithAI([name]).then(async (map) => {
+    classifyItemsWithAI([name], categoriesRef.current).then(async (map) => {
       const aiCategory = map[name];
       if (aiCategory && aiCategory !== currentCategory) {
         // supabase-js query builders only actually dispatch the request once
@@ -133,7 +139,7 @@ export function useGroceryList(phone: string | null, listId: string | null) {
   const addItem = useCallback(
     async (name: string, quantity: number, unit: string, imageUrl?: string, notes?: string) => {
       if (!phoneRef.current || !listIdRef.current) return;
-      const initialCategory = getCategoryForItem(name);
+      const initialCategory = getCategoryForItem(name, categoriesRef.current);
       const { data, error } = await supabase
         .from("grocery_items")
         .insert({
@@ -169,7 +175,7 @@ export function useGroceryList(phone: string | null, listId: string | null) {
       quantity: e.quantity ?? 1,
       unit: e.unit ?? "יח׳",
       image_url: e.imageUrl ?? null,
-      category: getCategoryForItem(e.name).key,
+      category: getCategoryForItem(e.name, categoriesRef.current).key,
       checked: false,
       notes: e.notes?.trim() ? e.notes.trim() : null,
     }));
@@ -185,7 +191,7 @@ export function useGroceryList(phone: string | null, listId: string | null) {
 
     // Background batch refinement: ask AI for every imported name at once,
     // then correct any rows whose local keyword guess it disagrees with.
-    classifyItemsWithAI(newItems.map((i) => i.name)).then(async (map) => {
+    classifyItemsWithAI(newItems.map((i) => i.name), categoriesRef.current).then(async (map) => {
       for (const item of newItems) {
         const aiCategory = map[item.name];
         if (aiCategory && aiCategory !== item.category) {
@@ -239,7 +245,7 @@ export function useGroceryList(phone: string | null, listId: string | null) {
       if (updates.name !== undefined) {
         dbUpdates.name = updates.name;
         if (updates.name !== current.name) {
-          dbUpdates.category = getCategoryForItem(updates.name).key;
+          dbUpdates.category = getCategoryForItem(updates.name, categoriesRef.current).key;
         }
       }
       if (updates.quantity !== undefined) dbUpdates.quantity = updates.quantity;
@@ -274,6 +280,62 @@ export function useGroceryList(phone: string | null, listId: string | null) {
     [items, refineCategory],
   );
 
+  // Called when a list's category set is saved with any content change
+  // (a category added, renamed, or deleted — not a pure reorder). Any list —
+  // the category manager can be opened for a list that isn't the currently-
+  // open one, so this talks to Supabase directly rather than relying on
+  // `items` state, which only reflects `listId`.
+  //
+  // First, items whose category was just deleted are immediately reassigned
+  // to "other" (awaited, so nothing goes invisible in the UI the instant the
+  // category set is saved). Then EVERY item in the list — not just the
+  // reassigned ones — goes through a background AI reclassification pass
+  // against the new category set: a renamed or newly-added category can be a
+  // better fit for items that were already sitting under a different one.
+  const reclassifyListCategories = useCallback(
+    async (targetListId: string, deletedKeys: string[], categories: GroceryCategory[]) => {
+      if (!phoneRef.current) return;
+
+      if (deletedKeys.length > 0) {
+        const { data: reassigned } = await supabase
+          .from("grocery_items")
+          .update({ category: "other" })
+          .eq("phone_number", phoneRef.current)
+          .eq("list_id", targetListId)
+          .in("category", deletedKeys)
+          .select("id");
+        if (reassigned && reassigned.length > 0 && targetListId === listIdRef.current) {
+          const ids = new Set(reassigned.map((r) => r.id));
+          setItems((prev) => prev.map((i) => (ids.has(i.id) ? { ...i, category: "other" } : i)));
+        }
+      }
+
+      const { data: allItems } = await supabase
+        .from("grocery_items")
+        .select("id,name,category")
+        .eq("phone_number", phoneRef.current)
+        .eq("list_id", targetListId);
+      if (!allItems || allItems.length === 0) return;
+
+      // Fire-and-forget: the realtime subscription (for the currently-open
+      // list) or a later refetch picks up each correction as it lands.
+      classifyItemsWithAI(
+        allItems.map((r) => r.name),
+        categories,
+      ).then(async (map) => {
+        for (const row of allItems) {
+          const aiCategory = map[row.name];
+          if (aiCategory && aiCategory !== row.category) {
+            // supabase-js query builders only actually dispatch the request
+            // once their thenable is consumed, so this await is required.
+            await supabase.from("grocery_items").update({ category: aiCategory }).eq("id", row.id);
+          }
+        }
+      });
+    },
+    [],
+  );
+
   // Mirror every change into the cache so an offline reopen shows the latest
   // state the device knows about.
   useEffect(() => {
@@ -290,5 +352,6 @@ export function useGroceryList(phone: string | null, listId: string | null) {
     removeItem,
     clearChecked,
     editItem,
+    reclassifyListCategories,
   };
 }

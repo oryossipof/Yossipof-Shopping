@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS public.saved_lists (
   name           TEXT        NOT NULL,
   items          JSONB       DEFAULT '[]'::jsonb,
   category_order JSONB,
+  categories     JSONB,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -22,6 +23,14 @@ CREATE TABLE IF NOT EXISTS public.saved_lists (
 -- Purely additive: existing rows are untouched and get category_order = NULL,
 -- which the app treats as "use the default category order".
 ALTER TABLE public.saved_lists ADD COLUMN IF NOT EXISTS category_order JSONB;
+
+-- Idempotent upgrade for databases created before categories existed.
+-- Purely additive: existing rows are untouched and get categories = NULL,
+-- which the app treats as "use the default 13 categories" (optionally
+-- reordered via the legacy category_order column above). When set, this
+-- column holds the list's full custom ordered category set as JSON:
+-- [{ "key": "...", "label": "...", "emoji": "..." }, ...].
+ALTER TABLE public.saved_lists ADD COLUMN IF NOT EXISTS categories JSONB;
 
 CREATE TABLE IF NOT EXISTS public.grocery_items (
   id            UUID        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,

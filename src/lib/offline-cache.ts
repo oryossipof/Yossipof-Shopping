@@ -4,6 +4,7 @@
 // truth, and it overwrites the cache as soon as a request succeeds.
 
 import type { GroceryItem } from "./grocery-store";
+import type { GroceryCategory } from "./grocery-categories";
 
 const ITEMS_PREFIX = "grocery-cache-items:";
 const LISTS_PREFIX = "grocery-cache-lists:";
@@ -48,6 +49,7 @@ export interface CachedList {
   name: string;
   createdAt: number;
   categoryOrder: string[] | null;
+  categories: GroceryCategory[] | null;
 }
 
 export function readCachedLists(phone: string | null): CachedList[] | null {

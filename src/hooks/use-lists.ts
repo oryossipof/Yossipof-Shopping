@@ -1,12 +1,15 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { readCachedLists, writeCachedLists, clearCachedItems } from "@/lib/offline-cache";
+import type { GroceryCategory } from "@/lib/grocery-categories";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface ShoppingList {
   id: string;
   name: string;
   createdAt: number;
   categoryOrder: string[] | null;
+  categories: GroceryCategory[] | null;
 }
 
 interface DbRow {
@@ -14,6 +17,7 @@ interface DbRow {
   name: string;
   created_at: string;
   category_order: string[] | null;
+  categories: GroceryCategory[] | null;
 }
 
 function rowToList(row: DbRow): ShoppingList {
@@ -22,6 +26,7 @@ function rowToList(row: DbRow): ShoppingList {
     name: row.name,
     createdAt: new Date(row.created_at).getTime(),
     categoryOrder: row.category_order ?? null,
+    categories: row.categories ?? null,
   };
 }
 
@@ -58,7 +63,7 @@ export function useLists(
     (async () => {
       const { data } = await supabase
         .from("saved_lists")
-        .select("id,name,created_at,category_order")
+        .select("id,name,created_at,category_order,categories")
         .eq("phone_number", phone)
         .order("created_at", { ascending: true });
       if (cancelled) return;
@@ -70,7 +75,7 @@ export function useLists(
         const { data: created } = await supabase
           .from("saved_lists")
           .insert({ phone_number: phone, name: "הרשימה שלי", items: [] })
-          .select("id,name,created_at,category_order")
+          .select("id,name,created_at,category_order,categories")
           .single();
         ensuringRef.current = false;
         if (created) rows = [rowToList(created as DbRow)];
@@ -104,7 +109,7 @@ export function useLists(
       const { data } = await supabase
         .from("saved_lists")
         .insert({ phone_number: phone, name: name.trim() || "רשימה חדשה", items: [] })
-        .select("id,name,created_at,category_order")
+        .select("id,name,created_at,category_order,categories")
         .single();
       if (!data) return null;
       const list = rowToList(data as DbRow);
@@ -139,6 +144,15 @@ export function useLists(
     await supabase.from("saved_lists").update({ category_order: order }).eq("id", id);
   }, []);
 
+  const updateListCategories = useCallback(async (id: string, categories: GroceryCategory[]) => {
+    setLists((prev) => {
+      const next = prev.map((l) => (l.id === id ? { ...l, categories } : l));
+      writeCachedLists(phoneRef.current, next);
+      return next;
+    });
+    await supabase.from("saved_lists").update({ categories: categories as unknown as Json }).eq("id", id);
+  }, []);
+
   const deleteList = useCallback(
     async (id: string) => {
       const remaining = lists.filter((l) => l.id !== id);
@@ -154,7 +168,7 @@ export function useLists(
           const { data } = await supabase
             .from("saved_lists")
             .insert({ phone_number: phone, name: "הרשימה שלי", items: [] })
-            .select("id,name,created_at,category_order")
+            .select("id,name,created_at,category_order,categories")
             .single();
           if (data) {
             const list = rowToList(data as DbRow);
@@ -167,5 +181,5 @@ export function useLists(
     [lists, currentListId, phone, setCurrentListId],
   );
 
-  return { lists, loaded, createList, renameList, deleteList, updateCategoryOrder };
+  return { lists, loaded, createList, renameList, deleteList, updateCategoryOrder, updateListCategories };
 }

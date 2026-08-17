@@ -1,9 +1,14 @@
-// Classifies grocery item names into one of the app's fixed categories using
+// Classifies grocery item names into one of the caller's category keys using
 // the Gemini API (free tier). Called in the background after an item is
 // added/edited so the UI can add items instantly with a local keyword guess,
 // then correct the category once a real classification comes back.
+//
+// Categories are per-list, not fixed: the caller passes the current list's
+// { key, label } category set in the request body. If it's missing/empty
+// (e.g. an older client, or a request made before the client rollout of
+// per-list categories), DEFAULT_CATEGORIES is used as a safe fallback.
 
-const CATEGORIES: { key: string; label: string }[] = [
+const DEFAULT_CATEGORIES: { key: string; label: string }[] = [
   { key: "fruits-vegetables", label: "פירות וירקות" },
   { key: "dairy", label: "מוצרי חלב" },
   { key: "meat-fish", label: "בשר ודגים" },
@@ -19,7 +24,29 @@ const CATEGORIES: { key: string; label: string }[] = [
   { key: "other", label: "אחר" },
 ];
 
-const CATEGORY_KEYS = CATEGORIES.map((c) => c.key);
+// Resolves the category set to classify against for this request: the
+// caller-supplied list categories when valid, guaranteeing "other" is always
+// present as a fallback key; otherwise DEFAULT_CATEGORIES.
+function resolveCategories(reqCategories: unknown): { key: string; label: string }[] {
+  if (Array.isArray(reqCategories) && reqCategories.length > 0) {
+    const cleaned = reqCategories
+      .filter(
+        (c): c is { key: string; label: string } =>
+          !!c &&
+          typeof c.key === "string" &&
+          c.key.trim().length > 0 &&
+          typeof c.label === "string" &&
+          c.label.trim().length > 0,
+      )
+      .map((c) => ({ key: c.key.trim(), label: c.label.trim() }));
+    if (cleaned.length > 0) {
+      return cleaned.some((c) => c.key === "other")
+        ? cleaned
+        : [...cleaned, { key: "other", label: "אחר" }];
+    }
+  }
+  return DEFAULT_CATEGORIES;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,7 +61,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { items } = await req.json();
+    const { items, categories: reqCategories } = await req.json();
     if (!Array.isArray(items) || items.length === 0) {
       return new Response(JSON.stringify({ results: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -57,7 +84,9 @@ Deno.serve(async (req: Request) => {
       throw new Error("GEMINI_API_KEY is not configured");
     }
 
-    const categoryList = CATEGORIES.map((c) => `- ${c.key}: ${c.label}`).join("\n");
+    const categories = resolveCategories(reqCategories);
+    const categoryKeys = categories.map((c) => c.key);
+    const categoryList = categories.map((c) => `- ${c.key}: ${c.label}`).join("\n");
     const itemList = names.map((n, i) => `${i + 1}. ${n}`).join("\n");
 
     const response = await fetch(
@@ -103,7 +132,7 @@ Deno.serve(async (req: Request) => {
                     type: "OBJECT",
                     properties: {
                       name: { type: "STRING" },
-                      category: { type: "STRING", enum: CATEGORY_KEYS },
+                      category: { type: "STRING", enum: categoryKeys },
                     },
                     required: ["name", "category"],
                   },
@@ -130,7 +159,7 @@ Deno.serve(async (req: Request) => {
     const results = names.map((name, i) => {
       const match = rawResults.find((r) => r.name === name) ?? rawResults[i];
       const category =
-        match && CATEGORY_KEYS.includes(match.category) ? match.category : "other";
+        match && categoryKeys.includes(match.category) ? match.category : "other";
       return { name, category };
     });
 

@@ -1,17 +1,17 @@
 import { useMemo, useState } from "react";
 import type { GroceryItem } from "@/lib/grocery-store";
 import { Button } from "@/components/ui/button";
-import { getCategoryForItem, getCategory } from "@/lib/grocery-categories";
+import { getCategoryForItem, type GroceryCategory } from "@/lib/grocery-categories";
 
 interface ExportListDialogProps {
   open: boolean;
   onClose: () => void;
   listName: string;
   items: GroceryItem[];
-  categoryOrder: string[];
+  categories: GroceryCategory[];
 }
 
-export function ExportListDialog({ open, onClose, listName, items, categoryOrder }: ExportListDialogProps) {
+export function ExportListDialog({ open, onClose, listName, items, categories }: ExportListDialogProps) {
   const [onlyUnchecked, setOnlyUnchecked] = useState(true);
   const [groupByCategory, setGroupByCategory] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -30,22 +30,19 @@ export function ExportListDialog({ open, onClose, listName, items, categoryOrder
     if (groupByCategory) {
       const groups: Record<string, GroceryItem[]> = {};
       for (const it of filtered) {
-        const key = it.category ?? getCategoryForItem(it.name).key;
+        const key = it.category ?? getCategoryForItem(it.name, categories).key;
         (groups[key] ||= []).push(it);
       }
-      body = categoryOrder
-        .filter((k) => groups[k]?.length)
-        .map((k) => {
-          const cat = getCategory(k);
-          return `${cat.emoji} ${cat.label}\n${groups[k].map(formatItem).join("\n")}`;
-        })
+      body = categories
+        .filter((c) => groups[c.key]?.length)
+        .map((cat) => `${cat.emoji} ${cat.label}\n${groups[cat.key].map(formatItem).join("\n")}`)
         .join("\n\n");
     } else {
       body = filtered.map(formatItem).join("\n");
     }
 
     return `🛒 ${listName}\n\n${body}\n\n—\nנשלח מ״קנייתי״`;
-  }, [items, listName, onlyUnchecked, groupByCategory, categoryOrder]);
+  }, [items, listName, onlyUnchecked, groupByCategory, categories]);
 
   const handleCopy = async () => {
     try {

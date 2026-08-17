@@ -105,30 +105,51 @@ const KEYWORD_MAP: Record<string, string> = {
   "בקבוק תינוק": "baby", "מזון תינוקות": "baby",
 };
 
-export function getCategoryForItem(name: string): GroceryCategory {
+// Falls back to `categories`' own "other" entry (or its last entry) instead
+// of the global default, so a list with a custom category set never shows a
+// key that doesn't belong to it.
+function fallbackCategory(categories: GroceryCategory[]): GroceryCategory {
+  return categories.find((c) => c.key === "other") ?? categories[categories.length - 1];
+}
+
+export function getCategoryForItem(
+  name: string,
+  categories: GroceryCategory[] = CATEGORIES,
+): GroceryCategory {
   const normalized = name.trim().toLowerCase();
+
+  const byKey = (key: string) => categories.find((c) => c.key === key);
 
   // Try exact match first
   if (KEYWORD_MAP[normalized]) {
-    return CATEGORIES.find((c) => c.key === KEYWORD_MAP[normalized])!;
-  }
-
-  // Try partial match (item name contains keyword or keyword contains item name)
-  for (const [keyword, categoryKey] of Object.entries(KEYWORD_MAP)) {
-    if (normalized.includes(keyword) || keyword.includes(normalized)) {
-      return CATEGORIES.find((c) => c.key === categoryKey)!;
+    const match = byKey(KEYWORD_MAP[normalized]);
+    if (match) return match;
+  } else {
+    // Try partial match (item name contains keyword or keyword contains item name)
+    for (const [keyword, categoryKey] of Object.entries(KEYWORD_MAP)) {
+      if (normalized.includes(keyword) || keyword.includes(normalized)) {
+        const match = byKey(categoryKey);
+        if (match) return match;
+        break;
+      }
     }
   }
 
-  return CATEGORIES.find((c) => c.key === "other")!;
+  return fallbackCategory(categories);
 }
 
-export function getCategory(key: string): GroceryCategory {
-  return CATEGORIES.find((c) => c.key === key) ?? CATEGORIES[CATEGORIES.length - 1];
+export function getCategory(
+  key: string,
+  categories: GroceryCategory[] = CATEGORIES,
+): GroceryCategory {
+  return categories.find((c) => c.key === key) ?? fallbackCategory(categories);
 }
 
+// Returns fresh copies, never the shared default array — callers (e.g. a
+// category manager's "reset to default" action) hold these in editable local
+// state, and in-place edits must never leak back into the app's defaults.
 export function getAllCategories(): GroceryCategory[] {
-  return CATEGORIES;
+  return CATEGORIES.map((c) => ({ ...c }));
 }
 
 // Ordered category keys for display
@@ -141,4 +162,39 @@ export const CATEGORY_ORDER = CATEGORIES.map((c) => c.key);
 export function resolveCategoryOrder(customOrder: string[] | null | undefined): string[] {
   if (!customOrder || customOrder.length === 0) return CATEGORY_ORDER;
   return [...customOrder, ...CATEGORY_ORDER.filter((k) => !customOrder.includes(k))];
+}
+
+// Single source of truth for "what categories does this list have, in what
+// order": a list's own custom `categories` set when it has one (guaranteed
+// to include "other"), otherwise the default 13 categories, optionally
+// reordered via the legacy `categoryOrder` — i.e. unchanged behavior for any
+// list that has never opened the category manager.
+export function resolveListCategories(
+  list:
+    | { categories?: GroceryCategory[] | null; categoryOrder?: string[] | null }
+    | null
+    | undefined,
+): GroceryCategory[] {
+  if (list?.categories && list.categories.length > 0) {
+    const hasOther = list.categories.some((c) => c.key === "other");
+    return hasOther ? list.categories : [...list.categories, getCategory("other")];
+  }
+  return resolveCategoryOrder(list?.categoryOrder ?? null).map((key) => getCategory(key));
+}
+
+// Derives a stable, URL/DB-safe key from a free-text category label
+// (Hebrew-aware: \p{L} matches Hebrew letters), unique among `existingKeys`.
+// Generated once when a category is added and never changes on rename — only
+// its label/emoji change — so items already assigned to it keep matching.
+export function generateCategoryKey(label: string, existingKeys: string[]): string {
+  const base =
+    label
+      .trim()
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-+|-+$/g, "") || "category";
+  if (!existingKeys.includes(base)) return base;
+  let n = 2;
+  while (existingKeys.includes(`${base}-${n}`)) n++;
+  return `${base}-${n}`;
 }
