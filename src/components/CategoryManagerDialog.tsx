@@ -31,8 +31,10 @@ export function CategoryManagerDialog({
   const [categories, setCategories] = useState<GroceryCategory[]>([]);
   const [newLabel, setNewLabel] = useState("");
   const [newEmoji, setNewEmoji] = useState("");
+  const [draggedKey, setDraggedKey] = useState<string | null>(null);
   const initialKeysRef = useRef<Set<string>>(new Set());
   const initialLabelsRef = useRef<Map<string, string>>(new Map());
+  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   useEffect(() => {
     if (!open) return;
@@ -45,17 +47,39 @@ export function CategoryManagerDialog({
     initialLabelsRef.current = new Map(start.map((c) => [c.key, c.label]));
     setNewLabel("");
     setNewEmoji("");
+    setDraggedKey(null);
   }, [open, initialCategories, initialOrder]);
 
-  const move = (index: number, direction: -1 | 1) => {
-    const target = index + direction;
-    if (target < 0 || target >= categories.length) return;
-    setCategories((prev) => {
-      const next = [...prev];
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
+  // Pointer-based drag reorder (works for mouse, touch, and pen alike).
+  // Started from a row's drag handle, which captures the pointer so move/up
+  // keep firing on it even once the finger/cursor leaves the handle itself.
+  const handleDragStart = (e: React.PointerEvent, key: string) => {
+    e.preventDefault();
+    setDraggedKey(key);
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
+
+  const handleDragMove = (e: React.PointerEvent) => {
+    if (!draggedKey) return;
+    for (const [key, el] of rowRefs.current) {
+      if (key === draggedKey) continue;
+      const rect = el.getBoundingClientRect();
+      if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        setCategories((prev) => {
+          const fromIndex = prev.findIndex((c) => c.key === draggedKey);
+          const toIndex = prev.findIndex((c) => c.key === key);
+          if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return prev;
+          const next = [...prev];
+          const [moved] = next.splice(fromIndex, 1);
+          next.splice(toIndex, 0, moved);
+          return next;
+        });
+        break;
+      }
+    }
+  };
+
+  const handleDragEnd = () => setDraggedKey(null);
 
   const updateField = (key: string, field: "label" | "emoji", value: string) => {
     if (key === "other") return;
@@ -125,11 +149,36 @@ export function CategoryManagerDialog({
         </p>
 
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1.5">
-          {categories.map((cat, index) => (
+          {categories.map((cat) => (
             <div
               key={cat.key}
-              className="flex items-center gap-2 rounded-xl bg-muted/50 p-2.5"
+              ref={(el) => {
+                if (el) rowRefs.current.set(cat.key, el);
+                else rowRefs.current.delete(cat.key);
+              }}
+              className={`flex items-center gap-2 rounded-xl bg-muted/50 p-2.5 transition-opacity ${
+                draggedKey === cat.key ? "opacity-40" : ""
+              }`}
             >
+              <button
+                type="button"
+                onPointerDown={(e) => handleDragStart(e, cat.key)}
+                onPointerMove={handleDragMove}
+                onPointerUp={handleDragEnd}
+                onPointerCancel={handleDragEnd}
+                style={{ touchAction: "none" }}
+                className="w-8 h-8 rounded-full hover:bg-background flex items-center justify-center text-muted-foreground cursor-grab active:cursor-grabbing flex-shrink-0"
+                aria-label="גרור לסידור מחדש"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <circle cx="9" cy="6" r="1.5" />
+                  <circle cx="15" cy="6" r="1.5" />
+                  <circle cx="9" cy="12" r="1.5" />
+                  <circle cx="15" cy="12" r="1.5" />
+                  <circle cx="9" cy="18" r="1.5" />
+                  <circle cx="15" cy="18" r="1.5" />
+                </svg>
+              </button>
               <input
                 type="text"
                 value={cat.emoji}
@@ -146,26 +195,6 @@ export function CategoryManagerDialog({
                 className="flex-1 min-w-0 rounded-lg border border-border bg-background px-2 py-1 text-sm font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="שם קטגוריה"
               />
-              <button
-                onClick={() => move(index, -1)}
-                disabled={index === 0}
-                className="w-8 h-8 rounded-full hover:bg-background flex items-center justify-center text-muted-foreground disabled:opacity-30 disabled:hover:bg-transparent"
-                aria-label="הזז למעלה"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" />
-                </svg>
-              </button>
-              <button
-                onClick={() => move(index, 1)}
-                disabled={index === categories.length - 1}
-                className="w-8 h-8 rounded-full hover:bg-background flex items-center justify-center text-muted-foreground disabled:opacity-30 disabled:hover:bg-transparent"
-                aria-label="הזז למטה"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                </svg>
-              </button>
               {cat.key !== "other" && (
                 <button
                   onClick={() => handleDelete(cat.key)}
