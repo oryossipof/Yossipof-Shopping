@@ -10,12 +10,18 @@
 -- ---------- טבלאות ----------
 
 CREATE TABLE IF NOT EXISTS public.saved_lists (
-  id            UUID        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  phone_number  TEXT        NOT NULL,
-  name          TEXT        NOT NULL,
-  items         JSONB       DEFAULT '[]'::jsonb,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+  id             UUID        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  phone_number   TEXT        NOT NULL,
+  name           TEXT        NOT NULL,
+  items          JSONB       DEFAULT '[]'::jsonb,
+  category_order JSONB,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Idempotent upgrade for databases created before category_order existed.
+-- Purely additive: existing rows are untouched and get category_order = NULL,
+-- which the app treats as "use the default category order".
+ALTER TABLE public.saved_lists ADD COLUMN IF NOT EXISTS category_order JSONB;
 
 CREATE TABLE IF NOT EXISTS public.grocery_items (
   id            UUID        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,

@@ -8,10 +8,11 @@ import { ImportItemsDialog } from "@/components/ImportItemsDialog";
 import { ImportFromListDialog } from "@/components/ImportFromListDialog";
 import { ExportListDialog } from "@/components/ExportListDialog";
 import { NotifyDialog } from "@/components/NotifyDialog";
+import { CategoryOrderDialog } from "@/components/CategoryOrderDialog";
 import { PhoneGate } from "@/components/PhoneGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getCategoryForItem, CATEGORY_ORDER, getCategory } from "@/lib/grocery-categories";
+import { getCategoryForItem, getCategory, resolveCategoryOrder } from "@/lib/grocery-categories";
 import type { GroceryItem } from "@/lib/grocery-store";
 import { usePhone } from "@/lib/use-phone";
 
@@ -42,6 +43,7 @@ export default function App() {
     createList,
     renameList,
     deleteList,
+    updateCategoryOrder,
   } = useLists(phone, currentListId, setCurrentListId);
   const { items, loaded, addItem, importItems, toggleItem, removeItem, clearChecked, editItem } =
     useGroceryList(phone, currentListId);
@@ -51,21 +53,28 @@ export default function App() {
   const [showImportFromList, setShowImportFromList] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showNotify, setShowNotify] = useState(false);
+  const [orderEditListId, setOrderEditListId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [hideChecked, setHideChecked] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   const currentList = lists.find((l) => l.id === currentListId);
+  const orderEditList = lists.find((l) => l.id === orderEditListId);
   const uncheckedCount = items.filter((i) => !i.checked).length;
   const checkedCount = items.filter((i) => i.checked).length;
+
+  const activeOrder = useMemo(
+    () => resolveCategoryOrder(currentList?.categoryOrder),
+    [currentList?.categoryOrder],
+  );
 
   const availableCategories = useMemo(() => {
     const set = new Set<string>();
     for (const item of items) {
       set.add(item.category ?? getCategoryForItem(item.name).key);
     }
-    return CATEGORY_ORDER.filter((k) => set.has(k)).map((k) => getCategory(k));
-  }, [items]);
+    return activeOrder.filter((k) => set.has(k)).map((k) => getCategory(k));
+  }, [items, activeOrder]);
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -90,11 +99,11 @@ export default function App() {
     for (const key of Object.keys(groups)) {
       groups[key].sort((a, b) => Number(a.checked) - Number(b.checked));
     }
-    return CATEGORY_ORDER.filter((key) => groups[key]?.length).map((key) => ({
+    return activeOrder.filter((key) => groups[key]?.length).map((key) => ({
       category: getCategory(key),
       items: groups[key],
     }));
-  }, [filteredItems]);
+  }, [filteredItems, activeOrder]);
 
   if (!phoneLoaded) {
     return (
@@ -163,6 +172,10 @@ export default function App() {
                   onCreate={(name) => createList(name)}
                   onDelete={deleteList}
                   onRename={renameList}
+                  onEditOrder={(id) => {
+                    setShowLists(false);
+                    setOrderEditListId(id);
+                  }}
                   onClose={() => setShowLists(false)}
                 />
               )}
@@ -363,6 +376,17 @@ export default function App() {
         onClose={() => setShowExport(false)}
         listName={currentList?.name ?? "רשימת קניות"}
         items={items}
+        categoryOrder={activeOrder}
+      />
+
+      <CategoryOrderDialog
+        open={!!orderEditListId}
+        onClose={() => setOrderEditListId(null)}
+        listName={orderEditList?.name ?? ""}
+        initialOrder={orderEditList?.categoryOrder ?? null}
+        onSave={(order) => {
+          if (orderEditListId) updateCategoryOrder(orderEditListId, order);
+        }}
       />
     </div>
   );

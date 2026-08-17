@@ -47,6 +47,7 @@ export interface CachedList {
   id: string;
   name: string;
   createdAt: number;
+  categoryOrder: string[] | null;
 }
 
 export function readCachedLists(phone: string | null): CachedList[] | null {

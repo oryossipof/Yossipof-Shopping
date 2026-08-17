@@ -1,16 +1,17 @@
 import { useMemo, useState } from "react";
 import type { GroceryItem } from "@/lib/grocery-store";
 import { Button } from "@/components/ui/button";
-import { getCategoryForItem, getCategory, CATEGORY_ORDER } from "@/lib/grocery-categories";
+import { getCategoryForItem, getCategory } from "@/lib/grocery-categories";
 
 interface ExportListDialogProps {
   open: boolean;
   onClose: () => void;
   listName: string;
   items: GroceryItem[];
+  categoryOrder: string[];
 }
 
-export function ExportListDialog({ open, onClose, listName, items }: ExportListDialogProps) {
+export function ExportListDialog({ open, onClose, listName, items, categoryOrder }: ExportListDialogProps) {
   const [onlyUnchecked, setOnlyUnchecked] = useState(true);
   const [groupByCategory, setGroupByCategory] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -32,7 +33,7 @@ export function ExportListDialog({ open, onClose, listName, items }: ExportListD
         const key = it.category ?? getCategoryForItem(it.name).key;
         (groups[key] ||= []).push(it);
       }
-      body = CATEGORY_ORDER
+      body = categoryOrder
         .filter((k) => groups[k]?.length)
         .map((k) => {
           const cat = getCategory(k);
@@ -44,7 +45,7 @@ export function ExportListDialog({ open, onClose, listName, items }: ExportListD
     }
 
     return `🛒 ${listName}\n\n${body}\n\n—\nנשלח מ״קנייתי״`;
-  }, [items, listName, onlyUnchecked, groupByCategory]);
+  }, [items, listName, onlyUnchecked, groupByCategory, categoryOrder]);
 
   const handleCopy = async () => {
     try {

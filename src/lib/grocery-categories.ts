@@ -133,3 +133,12 @@ export function getAllCategories(): GroceryCategory[] {
 
 // Ordered category keys for display
 export const CATEGORY_ORDER = CATEGORIES.map((c) => c.key);
+
+// Resolves a list's saved custom order (if any) into a full, display-ready
+// order — falling back to the default, and appending any categories the
+// custom order doesn't know about yet (e.g. if new categories are added
+// after the order was saved).
+export function resolveCategoryOrder(customOrder: string[] | null | undefined): string[] {
+  if (!customOrder || customOrder.length === 0) return CATEGORY_ORDER;
+  return [...customOrder, ...CATEGORY_ORDER.filter((k) => !customOrder.includes(k))];
+}

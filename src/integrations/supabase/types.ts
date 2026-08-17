@@ -66,6 +66,7 @@ export type Database = {
       }
       saved_lists: {
         Row: {
+          category_order: Json | null
           created_at: string
           id: string
           items: Json | null
@@ -73,6 +74,7 @@ export type Database = {
           phone_number: string
         }
         Insert: {
+          category_order?: Json | null
           created_at?: string
           id?: string
           items?: Json | null
@@ -80,6 +82,7 @@ export type Database = {
           phone_number: string
         }
         Update: {
+          category_order?: Json | null
           created_at?: string
           id?: string
           items?: Json | null

@@ -6,16 +6,23 @@ export interface ShoppingList {
   id: string;
   name: string;
   createdAt: number;
+  categoryOrder: string[] | null;
 }
 
 interface DbRow {
   id: string;
   name: string;
   created_at: string;
+  category_order: string[] | null;
 }
 
 function rowToList(row: DbRow): ShoppingList {
-  return { id: row.id, name: row.name, createdAt: new Date(row.created_at).getTime() };
+  return {
+    id: row.id,
+    name: row.name,
+    createdAt: new Date(row.created_at).getTime(),
+    categoryOrder: row.category_order ?? null,
+  };
 }
 
 export function useLists(
@@ -51,7 +58,7 @@ export function useLists(
     (async () => {
       const { data } = await supabase
         .from("saved_lists")
-        .select("id,name,created_at")
+        .select("id,name,created_at,category_order")
         .eq("phone_number", phone)
         .order("created_at", { ascending: true });
       if (cancelled) return;
@@ -63,7 +70,7 @@ export function useLists(
         const { data: created } = await supabase
           .from("saved_lists")
           .insert({ phone_number: phone, name: "הרשימה שלי", items: [] })
-          .select("id,name,created_at")
+          .select("id,name,created_at,category_order")
           .single();
         ensuringRef.current = false;
         if (created) rows = [rowToList(created as DbRow)];
@@ -97,7 +104,7 @@ export function useLists(
       const { data } = await supabase
         .from("saved_lists")
         .insert({ phone_number: phone, name: name.trim() || "רשימה חדשה", items: [] })
-        .select("id,name,created_at")
+        .select("id,name,created_at,category_order")
         .single();
       if (!data) return null;
       const list = rowToList(data as DbRow);
@@ -123,6 +130,15 @@ export function useLists(
     await supabase.from("saved_lists").update({ name: trimmed }).eq("id", id);
   }, []);
 
+  const updateCategoryOrder = useCallback(async (id: string, order: string[] | null) => {
+    setLists((prev) => {
+      const next = prev.map((l) => (l.id === id ? { ...l, categoryOrder: order } : l));
+      writeCachedLists(phoneRef.current, next);
+      return next;
+    });
+    await supabase.from("saved_lists").update({ category_order: order }).eq("id", id);
+  }, []);
+
   const deleteList = useCallback(
     async (id: string) => {
       const remaining = lists.filter((l) => l.id !== id);
@@ -138,7 +154,7 @@ export function useLists(
           const { data } = await supabase
             .from("saved_lists")
             .insert({ phone_number: phone, name: "הרשימה שלי", items: [] })
-            .select("id,name,created_at")
+            .select("id,name,created_at,category_order")
             .single();
           if (data) {
             const list = rowToList(data as DbRow);
@@ -151,5 +167,5 @@ export function useLists(
     [lists, currentListId, phone, setCurrentListId],
   );
 
-  return { lists, loaded, createList, renameList, deleteList };
+  return { lists, loaded, createList, renameList, deleteList, updateCategoryOrder };
 }
