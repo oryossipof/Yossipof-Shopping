@@ -6,6 +6,14 @@ import type { WriteResult } from "@/hooks/use-grocery-list";
 
 const UNITS = ["יח׳", "ק״ג", "גרם", "ליטר", "מ״ל", "חבילה", "קופסה"];
 
+/** The steppers never take the amount below this; typing still can. */
+const MIN_QUANTITY = 1;
+
+function parseQuantity(value: string): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : MIN_QUANTITY;
+}
+
 interface AddItemFormProps {
   onAdd: (
     name: string,
@@ -35,6 +43,13 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
     } catch {
       setImagePreview(undefined);
     }
+  };
+
+  // Rounded because 0.5 + 1 lands on 1.5000000000000002 in binary floating
+  // point, which would show up in the field.
+  const stepQuantity = (delta: number) => {
+    const next = Math.max(MIN_QUANTITY, parseQuantity(quantity) + delta);
+    setQuantity(String(Math.round(next * 10) / 10));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -117,18 +132,39 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
               templates with decimal fr values. */}
           <div
             className="grid gap-1 items-stretch"
-            style={{ gridTemplateColumns: "1.5fr 1.2fr 1fr 1.4fr" }}
+            style={{ gridTemplateColumns: "2.4fr 1.2fr 1fr 1.4fr" }}
           >
-            <input
-              type="number"
-              inputMode="decimal"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              onFocus={(e) => e.target.select()}
-              min="0.1"
-              step="0.1"
-              className="w-full min-w-0 rounded-lg bg-muted px-1 py-2 text-foreground text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
+            {/* Steppers so the common case needs no keyboard. Typing still
+                works, including the fractional amounts a כ״ג quantity needs. */}
+            <div className="flex items-stretch rounded-lg bg-muted overflow-hidden">
+              <button
+                type="button"
+                onClick={() => stepQuantity(-1)}
+                aria-label="הפחת כמות"
+                className="flex-shrink-0 px-2 text-lg leading-none text-muted-foreground hover:text-foreground hover:bg-black/5 disabled:opacity-30"
+                disabled={parseQuantity(quantity) <= MIN_QUANTITY}
+              >
+                −
+              </button>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                min="0.1"
+                step="0.1"
+                className="w-full min-w-0 bg-transparent px-0 py-2 text-foreground text-center focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => stepQuantity(1)}
+                aria-label="הוסף כמות"
+                className="flex-shrink-0 px-2 text-lg leading-none text-muted-foreground hover:text-foreground hover:bg-black/5"
+              >
+                +
+              </button>
+            </div>
             <select
               value={unit}
               onChange={(e) => setUnit(e.target.value)}

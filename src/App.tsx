@@ -11,6 +11,7 @@ import { NotifyDialog } from "@/components/NotifyDialog";
 import { CategoryManagerDialog } from "@/components/CategoryManagerDialog";
 import { PhoneGate } from "@/components/PhoneGate";
 import { Notice } from "@/components/Notice";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { TextSizeControl } from "@/components/TextSizeControl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,6 +77,7 @@ export default function App() {
   const [hideChecked, setHideChecked] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   // Imports drop products already in the list; tell the user what happened
   // rather than leaving them wondering why the count doesn't add up.
@@ -348,7 +350,12 @@ export default function App() {
                 </Button>
               )}
               {checkedCount > 0 && (
-                <Button variant="ghost" size="sm" onClick={clearChecked} className="text-xs">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmClear(true)}
+                  className="text-xs"
+                >
                   נקה שנקנו
                 </Button>
               )}
@@ -436,6 +443,19 @@ export default function App() {
             reclassifyListCategories(managerListId, deletedKeys, categories);
           }
         }}
+      />
+
+      <ConfirmDialog
+        open={confirmClear}
+        title="לנקות את המוצרים שנקנו?"
+        message={
+          checkedCount === 1
+            ? "מוצר אחד יוסר מהרשימה. לא ניתן לבטל את הפעולה."
+            : `${checkedCount} מוצרים יוסרו מהרשימה. לא ניתן לבטל את הפעולה.`
+        }
+        confirmLabel="נקה"
+        onConfirm={clearChecked}
+        onClose={() => setConfirmClear(false)}
       />
 
       <Notice message={notice} onDismiss={() => setNotice(null)} />
