@@ -13,6 +13,7 @@ import { PhoneGate } from "@/components/PhoneGate";
 import { Notice } from "@/components/Notice";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { TextSizeControl } from "@/components/TextSizeControl";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getCategoryForItem, resolveListCategories } from "@/lib/grocery-categories";
@@ -93,6 +94,22 @@ export default function App() {
       const skippedText =
         skipped === 1 ? "פריט אחד כבר היה ברשימה" : `${skipped} כבר היו ברשימה`;
       setNotice(`${addedText} · ${skippedText}`);
+    },
+    [importItems],
+  );
+
+  // Several names typed into the add box at once. Unlike an import, this is a
+  // deliberate action with no dialog of its own, so it always confirms what
+  // happened rather than only reporting skipped duplicates.
+  const handleAddMany = useCallback(
+    async (entries: ImportEntry[]) => {
+      const { added, skipped } = await importItems(entries);
+      if (added === 0) {
+        setNotice(skipped === 1 ? "המוצר כבר קיים ברשימה" : "כל המוצרים כבר קיימים ברשימה");
+        return;
+      }
+      const addedText = added === 1 ? "נוסף מוצר אחד" : `נוספו ${added} מוצרים`;
+      setNotice(skipped === 0 ? addedText : `${addedText} · ${skipped} כבר היו ברשימה`);
     },
     [importItems],
   );
@@ -221,6 +238,7 @@ export default function App() {
             </div>
             {/* Text size and phone share the title line */}
             <div className="flex items-center gap-1 flex-shrink-0">
+              <ThemeToggle />
               <TextSizeControl />
               <button
                 onClick={clearPhone}
@@ -274,7 +292,7 @@ export default function App() {
           </div>
 
           {/* Add item form — always visible */}
-          <AddItemForm onAdd={addItem} />
+          <AddItemForm onAdd={addItem} onAddMany={handleAddMany} />
 
           {/* Sticky search */}
           {items.length > 0 && (

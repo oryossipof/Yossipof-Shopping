@@ -1,22 +1,11 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { parseImportedNames } from "@/lib/parse-items";
 
 interface ImportItemsDialogProps {
   open: boolean;
   onClose: () => void;
   onImport: (names: string[]) => void;
-}
-
-function parseText(text: string): string[] {
-  return text
-    .split(/\r?\n|,|;|•|·/)
-    .map((line) =>
-      line
-        // strip checkbox markers, bullets, numbering
-        .replace(/^[\s\-\*\+\u2022\u25CB\u25A1\u2610\u2611\u2713\u2714\[\]xX\d\.\)]+/u, "")
-        .trim(),
-    )
-    .filter((line) => line.length > 0 && line.length < 100);
 }
 
 export function ImportItemsDialog({ open, onClose, onImport }: ImportItemsDialogProps) {
@@ -33,7 +22,7 @@ export function ImportItemsDialog({ open, onClose, onImport }: ImportItemsDialog
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const items = parseText(text);
+  const items = parseImportedNames(text);
 
   const handleSubmit = () => {
     if (items.length === 0) return;

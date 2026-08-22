@@ -2,7 +2,8 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { compressImage } from "@/lib/image-utils";
 import { DUPLICATE_MESSAGE } from "@/lib/normalize-name";
-import type { WriteResult } from "@/hooks/use-grocery-list";
+import { splitTypedNames } from "@/lib/parse-items";
+import type { ImportEntry, WriteResult } from "@/hooks/use-grocery-list";
 
 const UNITS = ["יח׳", "ק״ג", "גרם", "ליטר", "מ״ל", "חבילה", "קופסה"];
 
@@ -22,9 +23,11 @@ interface AddItemFormProps {
     imageUrl?: string,
     notes?: string,
   ) => Promise<WriteResult>;
+  /** Used when several names were typed at once, separated by commas. */
+  onAddMany: (entries: ImportEntry[]) => Promise<void>;
 }
 
-export function AddItemForm({ onAdd }: AddItemFormProps) {
+export function AddItemForm({ onAdd, onAddMany }: AddItemFormProps) {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [unit, setUnit] = useState("יח׳");
@@ -52,12 +55,37 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
     setQuantity(String(Math.round(next * 10) / 10));
   };
 
+  // "חלב, לחם, ביצים" adds three products in one go. They share the quantity,
+  // unit and note; a photo belongs to one product, so it is left out.
+  const typedNames = splitTypedNames(name);
+  const isMultiple = typedNames.length > 1;
+
+  const resetForm = () => {
+    setError(null);
+    setName("");
+    setQuantity("1");
+    setUnit("יח׳");
+    setNotes("");
+    setShowNotes(false);
+    setImagePreview(undefined);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (typedNames.length === 0) return;
+
+    if (isMultiple) {
+      const qty = parseQuantity(quantity);
+      const note = notes.trim() || undefined;
+      await onAddMany(typedNames.map((n) => ({ name: n, quantity: qty, unit, notes: note })));
+      resetForm();
+      return;
+    }
+
     const result = await onAdd(
-      name.trim(),
-      Number(quantity) || 1,
+      typedNames[0],
+      parseQuantity(quantity),
       unit,
       imagePreview,
       notes.trim() || undefined,
@@ -67,14 +95,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
       setError(DUPLICATE_MESSAGE);
       return;
     }
-    setError(null);
-    setName("");
-    setQuantity("1");
-    setUnit("יח׳");
-    setNotes("");
-    setShowNotes(false);
-    setImagePreview(undefined);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    resetForm();
   };
 
   return (
@@ -113,7 +134,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
               setName(e.target.value);
               if (error) setError(null);
             }}
-            placeholder="שם המוצר..."
+            placeholder="שם המוצר, או כמה בפסיק"
             aria-invalid={!!error}
             className={`w-full rounded-lg bg-muted px-3 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 text-base ${
               error ? "ring-2 ring-destructive/50 focus:ring-destructive/50" : "focus:ring-primary/30"
@@ -123,6 +144,11 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
             <p role="alert" className="text-xs text-destructive">
               {error}
             </p>
+          )}
+          {/* Only appears once a separator is typed, so the feature is found
+              at the moment it becomes relevant instead of cluttering the box. */}
+          {isMultiple && !error && (
+            <p className="text-xs text-primary">יתווספו {typedNames.length} מוצרים</p>
           )}
 
           {/* Quantity + Unit row */}
@@ -201,7 +227,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
                 </g>
               </svg>
             </button>
-            <Button type="submit" className="w-full min-w-0 px-1" disabled={!name.trim()}>
+            <Button type="submit" className="w-full min-w-0 px-1" disabled={typedNames.length === 0}>
               הוסף
             </Button>
           </div>
