@@ -64,12 +64,12 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="rounded-2xl bg-card p-4 shadow-sm border border-border">
-      <div className="flex gap-3 items-start">
+      <div className="flex gap-2 items-start">
         {/* Image upload button */}
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="flex-shrink-0 w-14 h-14 rounded-xl border-2 border-dashed border-border bg-muted flex items-center justify-center overflow-hidden hover:border-primary/50 transition-colors"
+          className="flex-shrink-0 w-11 h-11 rounded-xl border-2 border-dashed border-border bg-muted flex items-center justify-center overflow-hidden hover:border-primary/50 transition-colors"
         >
           {imagePreview ? (
             <img src={imagePreview} alt="תמונה" className="w-full h-full object-cover" />
@@ -111,7 +111,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
           )}
 
           {/* Quantity + Unit row */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1 items-stretch">
             <input
               type="number"
               inputMode="decimal"
@@ -120,12 +120,12 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
               onFocus={(e) => e.target.select()}
               min="0.1"
               step="0.1"
-              className="w-20 rounded-lg bg-muted px-3 py-2 text-foreground text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="flex-1 min-w-[2.5rem] rounded-lg bg-muted px-1 py-2 text-foreground text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             <select
               value={unit}
               onChange={(e) => setUnit(e.target.value)}
-              className="rounded-lg bg-muted px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="flex-shrink-0 rounded-lg bg-muted px-1 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               {UNITS.map((u) => (
                 <option key={u} value={u}>{u}</option>
@@ -139,7 +139,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
               aria-label={showNotes ? "בטל הערה" : "הוסף הערה"}
               aria-pressed={showNotes}
               title="הוסף הערה"
-              className={`flex-shrink-0 w-11 rounded-lg border flex items-center justify-center transition-colors ${
+              className={`flex-shrink-0 w-8 rounded-lg border flex items-center justify-center transition-colors ${
                 showNotes || notes.trim()
                   ? "bg-primary/15 border-primary/50"
                   : "bg-card border-border hover:bg-muted"
@@ -147,7 +147,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
             >
               {/* Pencil supplied by the user (Desktop/pen.svg), inlined so it
                   ships with the bundle and works offline. */}
-              <svg viewBox="0 0 16 16" className="w-7 h-7" aria-hidden="true">
+              <svg viewBox="0 0 16 16" className="w-6 h-6" aria-hidden="true">
                 <g transform="rotate(45 8 8)">
                   <polygon points="7,13 9,13 8,16" fill="#212121" />
                   <polygon points="6.5,11.5 9.5,11.5 9,13 7,13" fill="#A1887F" />
@@ -158,7 +158,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
                 </g>
               </svg>
             </button>
-            <Button type="submit" disabled={!name.trim()}>
+            <Button type="submit" className="flex-shrink-0 px-2.5" disabled={!name.trim()}>
               הוסף
             </Button>
           </div>

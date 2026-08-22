@@ -34,7 +34,7 @@ export function TextSizeControl() {
         className={btn}
         aria-label="הקטן את הטקסט"
       >
-        <span className="text-[11px]">א−</span>
+        <span className="text-[0.6875rem]">א−</span>
       </button>
       <button
         onClick={() => change(step + 1)}
@@ -42,7 +42,7 @@ export function TextSizeControl() {
         className={btn}
         aria-label="הגדל את הטקסט"
       >
-        <span className="text-[15px]">א+</span>
+        <span className="text-[0.9375rem]">א+</span>
       </button>
     </div>
   );

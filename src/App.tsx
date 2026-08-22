@@ -184,10 +184,10 @@ export default function App() {
                 className="flex items-center gap-1 min-w-0 text-right group"
               >
                 <div className="flex flex-col items-start min-w-0">
-                  <span className="text-sm font-bold text-foreground leading-tight truncate max-w-[160px] sm:max-w-none">
+                  <span className="text-sm font-bold text-foreground leading-tight truncate max-w-[10rem] sm:max-w-none">
                     {currentList?.name ?? "רשימת קניות"}
                   </span>
-                  <span className="text-[10px] text-muted-foreground leading-tight">
+                  <span className="text-[0.625rem] text-muted-foreground leading-tight">
                     {lists.length} רשימות · החלף
                   </span>
                 </div>
@@ -222,7 +222,7 @@ export default function App() {
               <TextSizeControl />
               <button
                 onClick={clearPhone}
-                className="flex-shrink-0 whitespace-nowrap text-[10px] text-muted-foreground hover:text-foreground"
+                className="flex-shrink-0 whitespace-nowrap text-[0.625rem] text-muted-foreground hover:text-foreground"
                 aria-label="החלף מספר טלפון"
               >
                 📱 {phone}
@@ -235,7 +235,7 @@ export default function App() {
           <div className="flex items-center flex-wrap gap-1.5">
               <button
                 onClick={() => setShowImport(true)}
-                className="flex-shrink-0 whitespace-nowrap text-[10px] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
+                className="flex-shrink-0 whitespace-nowrap text-[0.625rem] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
                 aria-label="ייבוא מקובץ"
                 title="ייבוא רשימה מקובץ"
               >
@@ -244,7 +244,7 @@ export default function App() {
               {lists.length > 1 && (
                 <button
                   onClick={() => setShowImportFromList(true)}
-                  className="flex-shrink-0 whitespace-nowrap text-[10px] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
+                  className="flex-shrink-0 whitespace-nowrap text-[0.625rem] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
                   aria-label="ייבוא מרשימה קיימת"
                   title="ייבוא פריטים מרשימה אחרת"
                 >
@@ -254,7 +254,7 @@ export default function App() {
               {items.length > 0 && (
                 <button
                   onClick={() => setShowExport(true)}
-                  className="flex-shrink-0 whitespace-nowrap text-[10px] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
+                  className="flex-shrink-0 whitespace-nowrap text-[0.625rem] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
                   aria-label="ייצוא רשימה"
                   title="ייצוא / שיתוף הרשימה"
                 >
@@ -263,7 +263,7 @@ export default function App() {
               )}
               <button
                 onClick={() => setShowNotify(true)}
-                className="flex-shrink-0 whitespace-nowrap text-[10px] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
+                className="flex-shrink-0 whitespace-nowrap text-[0.625rem] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
                 aria-label="שליחת עדכון בוואטסאפ"
                 title="הודעה שסיימת לעדכן / לקנות"
               >
