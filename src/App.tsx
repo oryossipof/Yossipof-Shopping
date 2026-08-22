@@ -11,6 +11,7 @@ import { NotifyDialog } from "@/components/NotifyDialog";
 import { CategoryManagerDialog } from "@/components/CategoryManagerDialog";
 import { PhoneGate } from "@/components/PhoneGate";
 import { Notice } from "@/components/Notice";
+import { TextSizeControl } from "@/components/TextSizeControl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getCategoryForItem, resolveListCategories } from "@/lib/grocery-categories";
@@ -253,6 +254,7 @@ export default function App() {
               >
                 💬 עדכון
               </button>
+              <TextSizeControl />
               <button
                 onClick={clearPhone}
                 className="flex-shrink-0 whitespace-nowrap text-[10px] text-muted-foreground hover:text-foreground"

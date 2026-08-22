@@ -89,7 +89,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
           className="hidden"
         />
 
-        <div className="flex-1 space-y-2">
+        <div className="flex-1 min-w-0 space-y-2">
           {/* Product name */}
           <input
             type="text"
@@ -111,7 +111,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
           )}
 
           {/* Quantity + Unit row */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <input
               type="number"
               inputMode="decimal"

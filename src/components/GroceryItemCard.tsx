@@ -120,7 +120,7 @@ export function GroceryItemCard({ item, onToggle, onRemove, onEdit }: GroceryIte
                 {error}
               </p>
             )}
-            <div className="flex gap-2 items-center">
+            <div className="flex flex-wrap gap-2 items-center">
               <input
                 type="number"
                 inputMode="decimal"
