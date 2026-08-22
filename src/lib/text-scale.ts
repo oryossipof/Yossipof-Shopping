@@ -51,7 +51,13 @@ export function writeTextSizeStep(step: number): void {
 export function applyTextSizeStep(step: number): void {
   try {
     const scale = TEXT_SIZE_STEPS[clampStep(step)];
-    document.documentElement.style.fontSize = `${(BASE_FONT_PX * scale).toFixed(2)}px`;
+    const root = document.documentElement;
+    root.style.fontSize = `${(BASE_FONT_PX * scale).toFixed(2)}px`;
+    // The sticky header holds the list name, the add form and the search box,
+    // and it is on screen at all times. Letting it grow with the text size
+    // would eat the room the products themselves need, so it is zoomed back
+    // down by the same factor and stays a constant size at every step.
+    root.style.setProperty("--header-zoom", String(1 / scale));
   } catch {
     // Ignore — the pinned size from styles.css still applies.
   }

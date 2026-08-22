@@ -171,10 +171,12 @@ export default function App() {
       {/* Sticky header (with list selector + search) */}
       <header
         className="sticky z-40 bg-background/95 backdrop-blur-md border-b border-border"
-        style={{ top: "env(safe-area-inset-top, 0px)" }}
+        // zoom counters the root font size, so the header keeps one size at
+        // every text step instead of crowding out the list. See lib/text-scale.
+        style={{ top: "env(safe-area-inset-top, 0px)", zoom: "var(--header-zoom, 1)" }}
       >
         <div className="max-w-lg sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 space-y-1.5">
-          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+          <div className="flex items-center justify-between gap-2">
             <div className="relative flex items-center gap-2 min-w-0">
               <span className="text-xl">🛒</span>
               <button
@@ -215,9 +217,22 @@ export default function App() {
                 />
               )}
             </div>
-            {/* Wraps to its own line rather than running off the edge when the
-                device's font scale makes these buttons wider. */}
-            <div className="flex items-center flex-wrap justify-end gap-1.5 min-w-0">
+            {/* Text size and phone share the title line */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <TextSizeControl />
+              <button
+                onClick={clearPhone}
+                className="flex-shrink-0 whitespace-nowrap text-[10px] text-muted-foreground hover:text-foreground"
+                aria-label="החלף מספר טלפון"
+              >
+                📱 {phone}
+              </button>
+            </div>
+          </div>
+
+          {/* List actions — wrap rather than running off the edge when the
+              text size makes these buttons wider. */}
+          <div className="flex items-center flex-wrap gap-1.5">
               <button
                 onClick={() => setShowImport(true)}
                 className="flex-shrink-0 whitespace-nowrap text-[10px] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
@@ -254,15 +269,6 @@ export default function App() {
               >
                 💬 עדכון
               </button>
-              <TextSizeControl />
-              <button
-                onClick={clearPhone}
-                className="flex-shrink-0 whitespace-nowrap text-[10px] text-muted-foreground hover:text-foreground"
-                aria-label="החלף מספר טלפון"
-              >
-                📱 {phone}
-              </button>
-            </div>
           </div>
 
           {/* Add item form — always visible */}

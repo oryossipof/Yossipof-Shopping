@@ -131,21 +131,40 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
                 <option key={u} value={u}>{u}</option>
               ))}
             </select>
-            <Button type="submit" className="mr-auto" disabled={!name.trim()}>
+            {/* Note toggle — an icon so it shares this row instead of taking
+                one of its own */}
+            <button
+              type="button"
+              onClick={() => setShowNotes((v) => !v)}
+              aria-label={showNotes ? "בטל הערה" : "הוסף הערה"}
+              aria-pressed={showNotes}
+              title="הוסף הערה"
+              className={`flex-shrink-0 w-11 rounded-lg border flex items-center justify-center transition-colors ${
+                showNotes || notes.trim()
+                  ? "bg-primary/15 border-primary/50"
+                  : "bg-card border-border hover:bg-muted"
+              }`}
+            >
+              {/* Pencil supplied by the user (Desktop/pen.svg), inlined so it
+                  ships with the bundle and works offline. */}
+              <svg viewBox="0 0 16 16" className="w-7 h-7" aria-hidden="true">
+                <g transform="rotate(45 8 8)">
+                  <polygon points="7,13 9,13 8,16" fill="#212121" />
+                  <polygon points="6.5,11.5 9.5,11.5 9,13 7,13" fill="#A1887F" />
+                  <rect x="6.5" y="4" width="3" height="7.5" fill="#FFEB3B" stroke="#444" strokeWidth="0.4" />
+                  <rect x="7.8" y="4" width="0.4" height="7.5" fill="#212121" />
+                  <rect x="6.5" y="3.2" width="3" height="0.8" fill="#B0BEC5" stroke="#444" strokeWidth="0.2" />
+                  <rect x="6.5" y="1.5" width="3" height="1.7" fill="#F48FB1" stroke="#444" strokeWidth="0.2" />
+                </g>
+              </svg>
+            </button>
+            <Button type="submit" disabled={!name.trim()}>
               הוסף
             </Button>
           </div>
 
-          {/* Notes toggle + field */}
-          {!showNotes ? (
-            <button
-              type="button"
-              onClick={() => setShowNotes(true)}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              + הוסף הערה
-            </button>
-          ) : (
+          {/* Note field, shown only once the icon is toggled on */}
+          {showNotes && (
             <input
               type="text"
               value={notes}
