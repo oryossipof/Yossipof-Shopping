@@ -1,11 +1,19 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { compressImage } from "@/lib/image-utils";
+import { DUPLICATE_MESSAGE } from "@/lib/normalize-name";
+import type { WriteResult } from "@/hooks/use-grocery-list";
 
 const UNITS = ["יח׳", "ק״ג", "גרם", "ליטר", "מ״ל", "חבילה", "קופסה"];
 
 interface AddItemFormProps {
-  onAdd: (name: string, quantity: number, unit: string, imageUrl?: string, notes?: string) => void;
+  onAdd: (
+    name: string,
+    quantity: number,
+    unit: string,
+    imageUrl?: string,
+    notes?: string,
+  ) => Promise<WriteResult>;
 }
 
 export function AddItemForm({ onAdd }: AddItemFormProps) {
@@ -14,6 +22,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
   const [unit, setUnit] = useState("יח׳");
   const [notes, setNotes] = useState("");
   const [showNotes, setShowNotes] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -28,16 +37,22 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onAdd(
+    const result = await onAdd(
       name.trim(),
       Number(quantity) || 1,
       unit,
       imagePreview,
       notes.trim() || undefined,
     );
+    // Keep everything the user typed so they can adjust the name and retry.
+    if (!result.ok) {
+      setError(DUPLICATE_MESSAGE);
+      return;
+    }
+    setError(null);
     setName("");
     setQuantity("1");
     setUnit("יח׳");
@@ -79,10 +94,21 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (error) setError(null);
+            }}
             placeholder="שם המוצר..."
-            className="w-full rounded-lg bg-muted px-3 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 text-base"
+            aria-invalid={!!error}
+            className={`w-full rounded-lg bg-muted px-3 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 text-base ${
+              error ? "ring-2 ring-destructive/50 focus:ring-destructive/50" : "focus:ring-primary/30"
+            }`}
           />
+          {error && (
+            <p role="alert" className="text-xs text-destructive">
+              {error}
+            </p>
+          )}
 
           {/* Quantity + Unit row */}
           <div className="flex gap-2">

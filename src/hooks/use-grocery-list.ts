@@ -4,6 +4,7 @@ import type { GroceryItem } from "@/lib/grocery-store";
 import { getCategoryForItem, type GroceryCategory } from "@/lib/grocery-categories";
 import { readCachedItems, writeCachedItems } from "@/lib/offline-cache";
 import { classifyItemsWithAI } from "@/lib/ai-classify";
+import { normalizeProductName } from "@/lib/normalize-name";
 
 interface DbRow {
   id: string;
@@ -24,6 +25,15 @@ export interface ImportEntry {
   unit?: string;
   notes?: string;
   imageUrl?: string;
+}
+
+/** Outcome of a write that can be refused because the name is already taken. */
+export type WriteResult = { ok: true } | { ok: false; reason: "duplicate" };
+
+export interface ImportResult {
+  added: number;
+  /** Entries dropped because that product is already in the list. */
+  skipped: number;
 }
 
 function rowToItem(row: DbRow): GroceryItem {
@@ -50,9 +60,24 @@ export function useGroceryList(
   const phoneRef = useRef(phone);
   const listIdRef = useRef(listId);
   const categoriesRef = useRef(categories);
+  // Lets the write callbacks see the current list without taking `items` as a
+  // dependency, which would give them a new identity on every change.
+  const itemsRef = useRef(items);
   phoneRef.current = phone;
   listIdRef.current = listId;
   categoriesRef.current = categories;
+  itemsRef.current = items;
+
+  // A product counts as already in the list whatever its state — including one
+  // already ticked off as bought. `exceptId` skips the item being renamed, so
+  // re-saving an item under its own name is never treated as a duplicate.
+  const isDuplicateName = useCallback((name: string, exceptId?: string) => {
+    const normalized = normalizeProductName(name);
+    if (!normalized) return false;
+    return itemsRef.current.some(
+      (i) => i.id !== exceptId && normalizeProductName(i.name) === normalized,
+    );
+  }, []);
 
   useEffect(() => {
     if (!phone || !listId) {
@@ -137,8 +162,15 @@ export function useGroceryList(
   }, []);
 
   const addItem = useCallback(
-    async (name: string, quantity: number, unit: string, imageUrl?: string, notes?: string) => {
-      if (!phoneRef.current || !listIdRef.current) return;
+    async (
+      name: string,
+      quantity: number,
+      unit: string,
+      imageUrl?: string,
+      notes?: string,
+    ): Promise<WriteResult> => {
+      if (!phoneRef.current || !listIdRef.current) return { ok: true };
+      if (isDuplicateName(name)) return { ok: false, reason: "duplicate" };
       const initialCategory = getCategoryForItem(name, categoriesRef.current);
       const { data, error } = await supabase
         .from("grocery_items")
@@ -155,19 +187,34 @@ export function useGroceryList(
         })
         .select()
         .single();
-      if (error || !data) return;
+      if (error || !data) return { ok: true };
       const item = rowToItem(data as DbRow);
       setItems((prev) => (prev.find((i) => i.id === item.id) ? prev : [item, ...prev]));
       refineCategory(item.id, name, initialCategory.key);
+      return { ok: true };
     },
-    [refineCategory],
+    [refineCategory, isDuplicateName],
   );
 
-  const importItems = useCallback(async (entries: (string | ImportEntry)[]) => {
-    if (!phoneRef.current || !listIdRef.current || entries.length === 0) return;
-    const normalized: ImportEntry[] = entries.map((e) =>
-      typeof e === "string" ? { name: e } : e,
-    );
+  const importItems = useCallback(async (entries: (string | ImportEntry)[]): Promise<ImportResult> => {
+    if (!phoneRef.current || !listIdRef.current || entries.length === 0) {
+      return { added: 0, skipped: 0 };
+    }
+    const all: ImportEntry[] = entries.map((e) => (typeof e === "string" ? { name: e } : e));
+
+    // Drop anything already in the list, and anything the incoming batch
+    // repeats within itself — a pasted list often names the same product twice.
+    const seen = new Set(itemsRef.current.map((i) => normalizeProductName(i.name)));
+    const normalized: ImportEntry[] = [];
+    for (const entry of all) {
+      const key = normalizeProductName(entry.name);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      normalized.push(entry);
+    }
+    const skipped = all.length - normalized.length;
+    if (normalized.length === 0) return { added: 0, skipped };
+
     const rows = normalized.map((e) => ({
       phone_number: phoneRef.current!,
       list_id: listIdRef.current!,
@@ -181,7 +228,7 @@ export function useGroceryList(
     }));
 
     const { data, error } = await supabase.from("grocery_items").insert(rows).select();
-    if (error || !data) return;
+    if (error || !data) return { added: 0, skipped };
     const newItems = data.map((r) => rowToItem(r as DbRow));
     setItems((prev) => {
       const existing = new Set(prev.map((i) => i.id));
@@ -201,6 +248,8 @@ export function useGroceryList(
         }
       }
     });
+
+    return { added: newItems.length, skipped };
   }, []);
 
   const toggleItem = useCallback(
@@ -232,9 +281,12 @@ export function useGroceryList(
     async (
       id: string,
       updates: Partial<Pick<GroceryItem, "name" | "quantity" | "unit" | "notes">>,
-    ) => {
+    ): Promise<WriteResult> => {
       const current = items.find((i) => i.id === id);
-      if (!current) return;
+      if (!current) return { ok: true };
+      if (updates.name !== undefined && isDuplicateName(updates.name, id)) {
+        return { ok: false, reason: "duplicate" };
+      }
       const dbUpdates: {
         name?: string;
         category?: string;
@@ -276,8 +328,9 @@ export function useGroceryList(
       if (dbUpdates.category !== undefined && updates.name !== undefined) {
         refineCategory(id, updates.name, dbUpdates.category);
       }
+      return { ok: true };
     },
-    [items, refineCategory],
+    [items, refineCategory, isDuplicateName],
   );
 
   // Called when a list's category set is saved with any content change

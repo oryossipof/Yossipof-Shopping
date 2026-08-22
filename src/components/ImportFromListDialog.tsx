@@ -76,8 +76,9 @@ export function ImportFromListDialog({
 
   if (!open) return null;
 
+  const q = search.trim().toLowerCase();
   const filtered = items.filter((i) =>
-    search.trim() ? i.name.toLowerCase().includes(search.trim().toLowerCase()) : true,
+    q ? i.name.toLowerCase().includes(q) || (i.notes?.toLowerCase().includes(q) ?? false) : true,
   );
 
   const allSelected = filtered.length > 0 && filtered.every((i) => selected.has(i.id));

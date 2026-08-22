@@ -1,11 +1,16 @@
 import { useState } from "react";
 import type { GroceryItem } from "@/lib/grocery-store";
+import { DUPLICATE_MESSAGE } from "@/lib/normalize-name";
+import type { WriteResult } from "@/hooks/use-grocery-list";
 
 interface GroceryItemCardProps {
   item: GroceryItem;
   onToggle: (id: string) => void;
   onRemove: (id: string) => void;
-  onEdit: (id: string, updates: Partial<Pick<GroceryItem, "name" | "quantity" | "unit" | "notes">>) => void;
+  onEdit: (
+    id: string,
+    updates: Partial<Pick<GroceryItem, "name" | "quantity" | "unit" | "notes">>,
+  ) => Promise<WriteResult>;
 }
 
 const UNITS = ["יח'", "ק\"ג", "גרם", "ליטר", "מ\"ל", "חבילה", "קופסה"];
@@ -17,17 +22,24 @@ export function GroceryItemCard({ item, onToggle, onRemove, onEdit }: GroceryIte
   const [editQty, setEditQty] = useState(String(item.quantity));
   const [editUnit, setEditUnit] = useState(item.unit);
   const [editNotes, setEditNotes] = useState(item.notes ?? "");
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (editName.trim()) {
       const qty = Number(editQty);
-      onEdit(item.id, {
+      const result = await onEdit(item.id, {
         name: editName.trim(),
         quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
         unit: editUnit,
         notes: editNotes,
       });
+      // Stay in edit mode so the name can be corrected without retyping.
+      if (!result.ok) {
+        setError(DUPLICATE_MESSAGE);
+        return;
+      }
     }
+    setError(null);
     setEditing(false);
   };
 
@@ -36,6 +48,7 @@ export function GroceryItemCard({ item, onToggle, onRemove, onEdit }: GroceryIte
     setEditQty(String(item.quantity));
     setEditUnit(item.unit);
     setEditNotes(item.notes ?? "");
+    setError(null);
     setEditing(false);
   };
 
@@ -44,6 +57,7 @@ export function GroceryItemCard({ item, onToggle, onRemove, onEdit }: GroceryIte
     setEditQty(String(item.quantity));
     setEditUnit(item.unit);
     setEditNotes(item.notes ?? "");
+    setError(null);
     setEditing(true);
   };
 
@@ -90,11 +104,22 @@ export function GroceryItemCard({ item, onToggle, onRemove, onEdit }: GroceryIte
             <input
               type="text"
               value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              onChange={(e) => {
+                setEditName(e.target.value);
+                if (error) setError(null);
+              }}
+              aria-invalid={!!error}
+              className={`w-full rounded-lg border bg-background px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 ${
+                error ? "border-destructive focus:ring-destructive" : "border-border focus:ring-primary"
+              }`}
               autoFocus
               onKeyDown={(e) => e.key === "Enter" && handleSave()}
             />
+            {error && (
+              <p role="alert" className="text-xs text-destructive">
+                {error}
+              </p>
+            )}
             <div className="flex gap-2 items-center">
               <input
                 type="number"

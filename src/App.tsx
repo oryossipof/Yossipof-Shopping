@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
-import { useGroceryList } from "@/hooks/use-grocery-list";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useGroceryList, type ImportEntry } from "@/hooks/use-grocery-list";
 import { useLists } from "@/hooks/use-lists";
 import { AddItemForm } from "@/components/AddItemForm";
 import { GroceryItemCard } from "@/components/GroceryItemCard";
@@ -10,6 +10,7 @@ import { ExportListDialog } from "@/components/ExportListDialog";
 import { NotifyDialog } from "@/components/NotifyDialog";
 import { CategoryManagerDialog } from "@/components/CategoryManagerDialog";
 import { PhoneGate } from "@/components/PhoneGate";
+import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getCategoryForItem, resolveListCategories } from "@/lib/grocery-categories";
@@ -73,6 +74,25 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [hideChecked, setHideChecked] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Imports drop products already in the list; tell the user what happened
+  // rather than leaving them wondering why the count doesn't add up.
+  const handleImport = useCallback(
+    async (entries: (string | ImportEntry)[]) => {
+      const { added, skipped } = await importItems(entries);
+      if (skipped === 0) return;
+      if (added === 0) {
+        setNotice(skipped === 1 ? "המוצר כבר קיים ברשימה" : "כל הפריטים כבר קיימים ברשימה");
+        return;
+      }
+      const addedText = added === 1 ? "נוסף פריט אחד" : `נוספו ${added} פריטים`;
+      const skippedText =
+        skipped === 1 ? "פריט אחד כבר היה ברשימה" : `${skipped} כבר היו ברשימה`;
+      setNotice(`${addedText} · ${skippedText}`);
+    },
+    [importItems],
+  );
 
   const managerList = lists.find((l) => l.id === managerListId);
   const uncheckedCount = items.filter((i) => !i.checked).length;
@@ -95,7 +115,12 @@ export default function App() {
         (i) => (i.category ?? getCategoryForItem(i.name, activeCategories).key) === categoryFilter,
       );
     }
-    if (q) result = result.filter((i) => i.name.toLowerCase().includes(q));
+    // Notes are searchable too — "כמה שיותר קשיחות" should find its item.
+    if (q) {
+      result = result.filter(
+        (i) => i.name.toLowerCase().includes(q) || (i.notes?.toLowerCase().includes(q) ?? false),
+      );
+    }
     return result;
   }, [items, search, hideChecked, categoryFilter, activeCategories]);
 
@@ -148,7 +173,7 @@ export default function App() {
         style={{ top: "env(safe-area-inset-top, 0px)" }}
       >
         <div className="max-w-lg sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
             <div className="relative flex items-center gap-2 min-w-0">
               <span className="text-xl">🛒</span>
               <button
@@ -189,10 +214,12 @@ export default function App() {
                 />
               )}
             </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Wraps to its own line rather than running off the edge when the
+                device's font scale makes these buttons wider. */}
+            <div className="flex items-center flex-wrap justify-end gap-1.5 min-w-0">
               <button
                 onClick={() => setShowImport(true)}
-                className="text-[10px] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
+                className="flex-shrink-0 whitespace-nowrap text-[10px] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
                 aria-label="ייבוא מקובץ"
                 title="ייבוא רשימה מקובץ"
               >
@@ -201,7 +228,7 @@ export default function App() {
               {lists.length > 1 && (
                 <button
                   onClick={() => setShowImportFromList(true)}
-                  className="text-[10px] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
+                  className="flex-shrink-0 whitespace-nowrap text-[10px] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
                   aria-label="ייבוא מרשימה קיימת"
                   title="ייבוא פריטים מרשימה אחרת"
                 >
@@ -211,7 +238,7 @@ export default function App() {
               {items.length > 0 && (
                 <button
                   onClick={() => setShowExport(true)}
-                  className="text-[10px] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
+                  className="flex-shrink-0 whitespace-nowrap text-[10px] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
                   aria-label="ייצוא רשימה"
                   title="ייצוא / שיתוף הרשימה"
                 >
@@ -220,7 +247,7 @@ export default function App() {
               )}
               <button
                 onClick={() => setShowNotify(true)}
-                className="text-[10px] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
+                className="flex-shrink-0 whitespace-nowrap text-[10px] text-muted-foreground hover:text-foreground rounded-md px-1.5 py-1 hover:bg-muted"
                 aria-label="שליחת עדכון בוואטסאפ"
                 title="הודעה שסיימת לעדכן / לקנות"
               >
@@ -228,7 +255,7 @@ export default function App() {
               </button>
               <button
                 onClick={clearPhone}
-                className="text-[10px] text-muted-foreground hover:text-foreground"
+                className="flex-shrink-0 whitespace-nowrap text-[10px] text-muted-foreground hover:text-foreground"
                 aria-label="החלף מספר טלפון"
               >
                 📱 {phone}
@@ -361,7 +388,7 @@ export default function App() {
       <ImportItemsDialog
         open={showImport}
         onClose={() => setShowImport(false)}
-        onImport={importItems}
+        onImport={handleImport}
       />
 
       <ImportFromListDialog
@@ -370,7 +397,7 @@ export default function App() {
         lists={lists}
         currentListId={currentListId}
         phone={phone}
-        onImport={importItems}
+        onImport={handleImport}
       />
 
       <NotifyDialog
@@ -402,6 +429,8 @@ export default function App() {
           }
         }}
       />
+
+      <Notice message={notice} onDismiss={() => setNotice(null)} />
     </div>
   );
 }
