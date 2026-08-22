@@ -111,7 +111,14 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
           )}
 
           {/* Quantity + Unit row */}
-          <div className="flex flex-wrap gap-1 items-stretch">
+          {/* One row, always. The columns share the width proportionally so
+              no control ends up much wider than the rest and none is left
+              over. Inline because Tailwind does not emit arbitrary grid
+              templates with decimal fr values. */}
+          <div
+            className="grid gap-1 items-stretch"
+            style={{ gridTemplateColumns: "1.5fr 1.2fr 1fr 1.4fr" }}
+          >
             <input
               type="number"
               inputMode="decimal"
@@ -120,12 +127,12 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
               onFocus={(e) => e.target.select()}
               min="0.1"
               step="0.1"
-              className="flex-1 min-w-[2.5rem] rounded-lg bg-muted px-1 py-2 text-foreground text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full min-w-0 rounded-lg bg-muted px-1 py-2 text-foreground text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             <select
               value={unit}
               onChange={(e) => setUnit(e.target.value)}
-              className="flex-shrink-0 rounded-lg bg-muted px-1 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full min-w-0 rounded-lg bg-muted px-1 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               {UNITS.map((u) => (
                 <option key={u} value={u}>{u}</option>
@@ -139,7 +146,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
               aria-label={showNotes ? "בטל הערה" : "הוסף הערה"}
               aria-pressed={showNotes}
               title="הוסף הערה"
-              className={`flex-shrink-0 w-8 rounded-lg border flex items-center justify-center transition-colors ${
+              className={`w-full min-w-0 rounded-lg border flex items-center justify-center transition-colors ${
                 showNotes || notes.trim()
                   ? "bg-primary/15 border-primary/50"
                   : "bg-card border-border hover:bg-muted"
@@ -158,7 +165,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
                 </g>
               </svg>
             </button>
-            <Button type="submit" className="flex-shrink-0 px-2.5" disabled={!name.trim()}>
+            <Button type="submit" className="w-full min-w-0 px-1" disabled={!name.trim()}>
               הוסף
             </Button>
           </div>
